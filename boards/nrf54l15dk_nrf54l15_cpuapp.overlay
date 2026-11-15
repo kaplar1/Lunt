@@ -1,0 +1,51 @@
+/*
+ * Board overlay for nRF54L15 DK (applied automatically for board target nrf54l15dk/nrf54l15/cpuapp).
+
+ * Adds a BOSCH BME280 on I2C instance i2c21:
+
+ * SCL -> P1.11
+ * SDA -> P1.12
+ * VCC -> VDDIO (Set VDD to 3.3 V in Board Configurator first)
+ * GND -> GND
+
+ * I2C address: 0x77 if the sensor's SDO pin is high (Adafruit, Waveshare),
+ * 0x76 if SDO is low (many generic purple GY-BME280 boards).
+ */
+
+&pinctrl {
+	i2c21_default: i2c21_default {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SCL,1,11)>,
+				<NRF_PSEL(TWIM_SDA,1,12)>;
+		};
+	};
+
+	i2c21_sleep: i2c21_sleep {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SCL,1,11)>,
+				<NRF_PSEL(TWIM_SDA,1,12)>;
+			low-power-enable;
+		};
+	};
+};
+
+&i2c21 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+	pinctrl-0 = <&i2c21_default>;
+	pinctrl-1 = <&i2c21_sleep>;
+	pinctrl-names = "default", "sleep";
+
+	bme280: bme280@77 {
+		compatible = "bosch,bme280";
+		reg = <0x77>;
+		status = "okay";
+	};
+};
+
+/ {
+	aliases {
+		/* The application finds the sensor through this alias */
+		luntsensor = &bme280;
+	};
+};
