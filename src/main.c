@@ -1,12 +1,17 @@
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <app_version.h>
+
+LOG_MODULE_REGISTER(Lunt, LOG_LEVEL_INF);
 
 int main(void)
 {
-	printk("Lunt: Hello for %s\n", CONFIG_BOARD_TARGET);
+	LOG_INF("Lunt: v%s booting on %s", APP_VERSION_STRING, CONFIG_BOARD_TARGET);
 
 	while (true) {
-		printk("uptime %u ms\n", k_uptime_get_32());
-		k_msleep(1000);
+		LOG_DBG("not shown: debug is below the INF level we registered");
+		LOG_INF("alive");
+		k_sleep(K_SECONDS(10));
 	}
 	return 0;
 }
