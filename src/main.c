@@ -10,6 +10,9 @@ device tree name LED0 -> "led0" Button 0 -> "sw0"
 #include <zephyr/logging/log.h>
 #include <app_version.h>
 
+#include "app_types.h"
+#include "conversions.h"
+
 LOG_MODULE_REGISTER(Lunt, LOG_LEVEL_INF);
 
 static const struct device *const lunt_dev = DEVICE_DT_GET(DT_ALIAS(luntsensor));
@@ -27,21 +30,42 @@ static void button_isr(const struct device *dev, struct gpio_callback *cb, uint3
 	k_sem_give(&wake_sem);
 }
 
-static void read_and_log(void)
+static int read_sample(struct lunt_sample *out)
 {
 	struct sensor_value temp, hum, press;
+	int rc = sensor_sample_fetch(lunt_dev);
 
-	if (sensor_sample_fetch(lunt_dev) != 0) {
-		LOG_ERR("Sensor fetch failed");
-		return;
+	if (rc == 0) {
+		rc = sensor_channel_get(lunt_dev, SENSOR_CHAN_AMBIENT_TEMP, &temp);
 	}
-	sensor_channel_get(lunt_dev, SENSOR_CHAN_AMBIENT_TEMP, &temp);
-	sensor_channel_get(lunt_dev, SENSOR_CHAN_HUMIDITY, &hum);
-	sensor_channel_get(lunt_dev, SENSOR_CHAN_PRESS, &press);
+	if (rc == 0) {
+		rc = sensor_channel_get(lunt_dev, SENSOR_CHAN_HUMIDITY, &hum);
+	}
+	if (rc == 0) {
+		rc = sensor_channel_get(lunt_dev, SENSOR_CHAN_PRESS, &press);
+	}
+	if (rc) {
+		LOG_ERR("Sensor read failed (%d)", rc);
+		return rc;
+	}
 
-	/*val1 = integer part, val2 = millionths */
-	LOG_INF("T=%d.%06d C RH=%d.%06d %% P=%d.%06d kPa", temp.val1, temp.val2, hum.val1, hum.val2,
-		press.val1, press.val2);
+	out->temp_centi_c = sv_to_centi(temp.val1, temp.val2);
+	out->hum_centi_pct = sv_to_centi(hum.val1, hum.val2);
+	out->press_deci_pa = kpa_sv_to_deci_pa(press.val1, press.val2);
+	out->uptime_ms = k_uptime_get();
+	return 0;
+}
+
+static void log_sample(const struct lunt_sample *s)
+{
+	char t[16], h[16], p[16];
+
+	format_centi(t, sizeof(t), s->temp_centi_c);
+	format_centi(h, sizeof(h), s->hum_centi_pct);
+	/*deci-Pa / 10 = centi-hPa, printed as hPA with 2 decimals*/
+	format_centi(p, sizeof(p), s->press_deci_pa / 10);
+
+	LOG_INF("T=%s C RH=%s %% P=%s hPa", t, h, p);
 }
 
 int main(void)
@@ -61,7 +85,11 @@ int main(void)
 	gpio_add_callback(button.port, &button_cb);
 
 	while (true) {
-		read_and_log();
+		struct lunt_sample s;
+
+		if (read_sample(&s) == 0) {
+			log_sample(&s);
+		}
 		gpio_pin_toggle_dt(&led);
 		(void)k_sem_take(&wake_sem, K_SECONDS(10));
 	}
