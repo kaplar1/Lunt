@@ -1,0 +1,9 @@
+tests:
+  luntnode.conversions:
+    tags: luntnode
+    platform_allow:
+      - nrf54l15dk/nrf54l15/cpuapp
+      - native_sim
+      - native_sim/native/64
+    integration_platforms:
+    - nrf54l15dk/nrf43l15/cpuapp
