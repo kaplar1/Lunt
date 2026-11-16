@@ -6,5 +6,6 @@ target_include_directories(app PRIVATE src)
 
 target_sources(app PRIVATE 
 src/main.c
+src/sensor_task.c
 src/conversions.c
 )

@@ -1,7 +1,5 @@
-/*Accessing LED and button through devicetree aliases, and the first
-interrupt-to-thread handoff
-device tree name LED0 -> "led0" Button 0 -> "sw0"
-*/
+/* Main is now only a consumer side
+Button 0 ISR --sem--> sensor thread --msgq--> main thread --> log, LED */
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
@@ -12,50 +10,54 @@ device tree name LED0 -> "led0" Button 0 -> "sw0"
 
 #include "app_types.h"
 #include "conversions.h"
+#include "sensor_task.h"
 
 LOG_MODULE_REGISTER(Lunt, LOG_LEVEL_INF);
 
-static const struct device *const lunt_dev = DEVICE_DT_GET(DT_ALIAS(luntsensor));
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET(DT_ALIAS(sw0), gpios);
 static struct gpio_callback button_cb;
 
-static K_SEM_DEFINE(wake_sem, 0, 1);
+static void led_off_handler(struct k_work *work)
+{
+	ARG_UNUSED(work);
+	gpio_pin_set_dt(&led, 0);
+}
+static K_WORK_DELAYABLE_DEFINE(led_off_work, led_off_handler);
+
+static void led_blink(void)
+{
+	if (led.port == NULL) {
+		if (led.port == NULL) {
+			return;
+		}
+		gpio_pin_set_dt(&led, 1);
+		k_work_reschedule(&led_off_work, K_MSEC(50));
+	}
+}
 
 static void button_isr(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
 	ARG_UNUSED(dev);
 	ARG_UNUSED(cb);
 	ARG_UNUSED(pins);
-	k_sem_give(&wake_sem);
+	sensor_task_trigger();
 }
 
-static int read_sample(struct lunt_sample *out)
+static void io_init(void)
 {
-	struct sensor_value temp, hum, press;
-	int rc = sensor_sample_fetch(lunt_dev);
-
-	if (rc == 0) {
-		rc = sensor_channel_get(lunt_dev, SENSOR_CHAN_AMBIENT_TEMP, &temp);
-	}
-	if (rc == 0) {
-		rc = sensor_channel_get(lunt_dev, SENSOR_CHAN_HUMIDITY, &hum);
-	}
-	if (rc == 0) {
-		rc = sensor_channel_get(lunt_dev, SENSOR_CHAN_PRESS, &press);
-	}
-	if (rc) {
-		LOG_ERR("Sensor read failed (%d)", rc);
-		return rc;
+	if (led.port && gpio_is_ready_dt(&led)) {
+		gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
 	}
 
-	out->temp_centi_c = sv_to_centi(temp.val1, temp.val2);
-	out->hum_centi_pct = sv_to_centi(hum.val1, hum.val2);
-	out->press_deci_pa = kpa_sv_to_deci_pa(press.val1, press.val2);
-	out->uptime_ms = k_uptime_get();
-	return 0;
+	if (button.port && gpio_is_ready_dt(&button)) {
+		gpio_pin_configure_dt(&button, GPIO_INPUT);
+		gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
+		gpio_init_callback(&button_cb, button_isr, BIT(button.pin));
+		gpio_add_callback(button.port, &button_cb);
+		LOG_INF("Press Button 0 for an immediate reading");
+	}
 }
-
 static void log_sample(const struct lunt_sample *s)
 {
 	char t[16], h[16], p[16];
@@ -72,26 +74,15 @@ int main(void)
 {
 	LOG_INF("Lunt: v%s booting on %s", APP_VERSION_STRING, CONFIG_BOARD_TARGET);
 
-	if (!device_is_ready(lunt_dev)) {
-		LOG_ERR("Sensor %s is not ready: check wiring 3.3 v V VDD amd I2C Address",
-			lunt_dev->name);
-		return 0;
-	}
-
-	gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
-	gpio_pin_configure_dt(&button, GPIO_INPUT);
-	gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
-	gpio_init_callback(&button_cb, button_isr, BIT(button.pin));
-	gpio_add_callback(button.port, &button_cb);
+	io_init();
+	sensor_task_start();
 
 	while (true) {
 		struct lunt_sample s;
 
-		if (read_sample(&s) == 0) {
-			log_sample(&s);
-		}
-		gpio_pin_toggle_dt(&led);
-		(void)k_sem_take(&wake_sem, K_SECONDS(10));
+		k_msgq_get(&sample_msgq, &s, K_FOREVER);
+		log_sample(&s);
+		led_blink();
 	}
 	return 0;
 }
