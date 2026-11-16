@@ -12,7 +12,7 @@ Button 0 ISR --sem--> sensor thread --msgq--> main thread --> log, LED */
 #include "conversions.h"
 #include "sensor_task.h"
 
-LOG_MODULE_REGISTER(Lunt, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(Lunt, CONFIG_APP_LOG_LEVEL);
 
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET(DT_ALIAS(sw0), gpios);

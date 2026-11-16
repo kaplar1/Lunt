@@ -1,0 +1,22 @@
+# Application Kconfig: our own build-time options. they appear in 
+# menuconfig/guiconfig and can be set in prj.conf, an overlay .conf file
+# or on the command line with -DCONFIG_<NAME>=<VALUE>
+
+menu "LuntNode application"
+
+config APP_SAMPLE_INTERVAL_SEC
+    int "Seconds between sensor readings"
+    default 10
+    range 1 3600
+    help
+      The sensor thread sleeps this long between readings. Presssing 
+      Button 0 triggers an immediate reading.
+
+# Creates CONFIG_APP_LOG_LEVEL and APP_LOG_LEVEL_{OFF,ERR,WRN,INF,DBG}
+module = APP
+module-str = LuntNode application
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu
+
+source "Kconfig.zephyr"

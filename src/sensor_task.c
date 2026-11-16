@@ -16,9 +16,7 @@ has nothing to do, so the kernel dies.
 #include "conversions.h"
 #include "sensor_task.h"
 
-LOG_MODULE_REGISTER(sensor_task, LOG_LEVEL_INF);
-
-#define SAMPLE_INTERVAL_SEC 10
+LOG_MODULE_REGISTER(sensor_task, CONFIG_APP_LOG_LEVEL);
 
 #define SENSOR_NODE DT_ALIAS(luntsensor)
 
@@ -80,7 +78,7 @@ static void sensor_thread(void *p1, void *p2, void *p3)
 	ARG_UNUSED(p2);
 	ARG_UNUSED(p3);
 
-	LOG_INF("Sensor thread started, interval %d s", SAMPLE_INTERVAL_SEC);
+	LOG_INF("Sensor thread started, interval %d s", CONFIG_APP_SAMPLE_INTERVAL_SEC);
 
 	while (true) {
 		struct lunt_sample s;
@@ -90,7 +88,7 @@ static void sensor_thread(void *p1, void *p2, void *p3)
 		}
 
 		/* Sleep until the interval passes OR the button is pressed. */
-		(void)k_sem_take(&measure_now_sem, K_SECONDS(SAMPLE_INTERVAL_SEC));
+		(void)k_sem_take(&measure_now_sem, K_SECONDS(CONFIG_APP_SAMPLE_INTERVAL_SEC));
 	}
 }
 
