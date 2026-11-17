@@ -1,0 +1,20 @@
+/*
+Route MCUmgr (SMP) to UART30, which the DK's debugger exposes as the second virtual COM port. Logs stay on UART20 (first COM port).
+
+Pass with : -DEXTRA_DTC_OVERLAY_FILE=uart-dfu.overlay
+(It is added on top of boards/nrf54l15dk_nrf54l15_cpuapp.overlay)
+*/
+
+/ {
+	chosen {
+		zephyr,uart-mcumgr = &uart30;
+	};
+};
+
+&uart30 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart30_default>;
+	pinctrl-1 = <&uart30_sleep>;
+	pinctrl-names = "default", "sleep"
+};

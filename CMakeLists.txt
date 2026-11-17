@@ -8,4 +8,5 @@ target_sources(app PRIVATE
 src/main.c
 src/sensor_task.c
 src/conversions.c
+src/dfu_confirm.c
 )

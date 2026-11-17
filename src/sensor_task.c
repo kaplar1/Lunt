@@ -84,6 +84,32 @@ static int sensor_read_once(struct lunt_sample *out)
 	return 0;
 }
 
+bool sensor_selftest(void)
+{
+	struct lunt_sample s;
+
+	if (IS_ENABLED(CONFIG_APP_FAIL_SELFTEST)) {
+		LOG_WRN("CONFIG_APP_FAIL_SELFTEST=y: failing self-test on purpose");
+		return false;
+	}
+
+	if (!device_is_ready(lunt_dev)) {
+		LOG_ERR("Sensor %s not ready (writing, VDD or I2C address?)", lunt_dev->name);
+		return false;
+	}
+
+	if (sensor_read_once(&s) != 0) {
+		return false;
+	}
+
+	if (!lunt_values_plausible(s.temp_centi_c, s.hum_centi_pct, s.press_deci_pa)) {
+		LOG_ERR("Implausible reading: %d cC, %d c%%, %dPa", s.temp_centi_c, s.hum_centi_pct,
+			s.press_deci_pa);
+		return false;
+	}
+	return true;
+}
+
 void sensor_task_trigger(void)
 {
 	/* k_sem_give is ISR-safe. Never read the sensor from the ISR itself:

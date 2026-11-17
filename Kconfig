@@ -12,6 +12,20 @@ config APP_SAMPLE_INTERVAL_SEC
       The sensor thread sleeps this long between readings. Presssing 
       Button 0 triggers an immediate reading.
 
+config APP_FAIL_SELFTEST
+    bool "Deliberately fail the boot self-test (rollback demo)"
+    help
+      Build a version with this on, upload it as a TEST image, and watch 
+      MCUboot revert to the previous version because the new image never 
+      confirms itself.
+
+config APP_SELFTEST_REBOOT_DELAY_SEC
+    int "Seconds to wait before rebooting after a failed self-test"
+    default 5
+    help
+      Only used when the running image is a test image that MCUboot will 
+      revert on the next reboot.
+
 # Creates CONFIG_APP_LOG_LEVEL and APP_LOG_LEVEL_{OFF,ERR,WRN,INF,DBG}
 module = APP
 module-str = LuntNode application

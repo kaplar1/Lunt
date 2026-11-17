@@ -1,15 +1,27 @@
-/* Main is now only a consumer side
-Button 0 ISR --sem--> sensor thread --msgq--> main thread --> log, LED */
+/* LuntNode main: boot sequence and the consumer side of the data flow:
+Button 0 ISR --sem--> sensor thread --msgq--> main thread --> log, LED
+
+Boot sequece:
+1.) Log version and MCUboot image state
+2.) Self-test the sensor
+3.) Pass -> confirm the image so MCUboot keeps it
+	Fail on a test image -> reboot, MCUboot reverts to the old image
+	Fail on a confirmed image -> keep running and keep retrying
+4.) Start the sensor thread
+*/
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
+#include <zephyr/devicetree.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/reboot.h>
 #include <app_version.h>
 
 #include "app_types.h"
 #include "conversions.h"
+#include "dfu_confirm.h"
 #include "sensor_task.h"
 
 LOG_MODULE_REGISTER(Lunt, CONFIG_APP_LOG_LEVEL);
@@ -58,6 +70,33 @@ static void io_init(void)
 		LOG_INF("Press Button 0 for an immediate reading");
 	}
 }
+
+static void boot_selftest_and_confirm(void)
+{
+	dfu_log_state();
+
+	if (sensor_selftest()) {
+
+		if (sensor_selftest()) {
+			(void)dfu_confirm_image();
+			return;
+		}
+
+		if (dfu_revert_pending()) {
+			LOG_ERR("Self-test FAILED on a test image. Not confirming.");
+			LOG_ERR("Rebooting in %d s;MCUboot will restore the previous image.",
+				CONFIG_APP_SELFTEST_REBOOT_DELAY_SEC);
+			k_sleep(K_SECONDS(CONFIG_APP_SELFTEST_REBOOT_DELAY_SEC));
+			sys_reboot(SYS_REBOOT_COLD);
+		}
+		/*
+		Confirmed (or debugger-flashed) image with nothing to revert to:
+		rebooting would only loop. Run degraded and keep trying.
+		LOG_ERR("Self-test FAILED. No previous image to revert to; running degraded.");
+		*/
+	}
+}
+
 static void log_sample(const struct lunt_sample *s)
 {
 	char t[16], h[16], p[16];
@@ -75,6 +114,7 @@ int main(void)
 	LOG_INF("Lunt: v%s booting on %s", APP_VERSION_STRING, CONFIG_BOARD_TARGET);
 
 	io_init();
+	boot_selftest_and_confirm();
 	sensor_task_start();
 
 	while (true) {

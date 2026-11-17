@@ -1,0 +1,10 @@
+/*
+Devicetree overlay for the MCUBoot image only.
+MCUBoot must run from the root partition, not from slot 0 where the application lives.
+(Recent nRF Connect SDK versions use devicetree partitioning, so this is set explicitly.)
+*/
+/ {
+	chosen {
+		zephyr,code-partition = &boot_partition;
+	};
+};
