@@ -10,3 +10,5 @@ src/sensor_task.c
 src/conversions.c
 src/dfu_confirm.c
 )
+# Only compiled when the BLE overlay is used (CONFIG_APP_BLE=y)
+target_sources_ifdef(CONFIG_APP_BLE app PRIVATE src/ble_ess.c)

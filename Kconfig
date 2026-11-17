@@ -19,6 +19,12 @@ config APP_FAIL_SELFTEST
       MCUboot revert to the previous version because the new image never 
       confirms itself.
 
+config APP_BLE
+	bool "Expose readings over the Bluetooth LE Environmental Sensing Service"
+	depends on BT_PERIPHERAL
+	help
+	  Enabled by overlay-ble.conf.
+    
 config APP_SELFTEST_REBOOT_DELAY_SEC
     int "Seconds to wait before rebooting after a failed self-test"
     default 5

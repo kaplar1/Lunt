@@ -7,7 +7,7 @@ Boot sequece:
 3.) Pass -> confirm the image so MCUboot keeps it
 	Fail on a test image -> reboot, MCUboot reverts to the old image
 	Fail on a confirmed image -> keep running and keep retrying
-4.) Start the sensor thread
+4.) Start the BLE (if built in), button, sensor thread
 */
 
 #include <zephyr/kernel.h>
@@ -23,6 +23,9 @@ Boot sequece:
 #include "conversions.h"
 #include "dfu_confirm.h"
 #include "sensor_task.h"
+#if defined(CONFIG_APP_BLE)
+#include "ble_ess.h"
+#endif
 
 LOG_MODULE_REGISTER(Lunt, CONFIG_APP_LOG_LEVEL);
 
@@ -115,6 +118,11 @@ int main(void)
 
 	io_init();
 	boot_selftest_and_confirm();
+
+#if defined(CONFIG_APP_BLE)
+	(void)ble_ess_init();
+#endif
+
 	sensor_task_start();
 
 	while (true) {
@@ -123,6 +131,10 @@ int main(void)
 		k_msgq_get(&sample_msgq, &s, K_FOREVER);
 		log_sample(&s);
 		led_blink();
+
+#if defined(CONFIG_APP_BLE)
+		ble_ess_update(&s);
+#endif
 	}
 	return 0;
 }
